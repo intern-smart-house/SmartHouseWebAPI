@@ -1,0 +1,186 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart House</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" integrity="sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ" crossorigin="anonymous">
+    <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" />
+    <link href="~/css/site.css" rel="stylesheet" />
+</head>
+<body>
+
+    <div class="container pt-2">
+        <h1 class="display-3">Command your house.</h1>
+        <hr />
+        <button class="btn btn-outline-primary btn-lg btn-block" style="font-size: 2em; height: 5em" onclick="startConverting();"><i class="fa fa-microphone"></i></button>
+        <hr />
+        <div class="container-fluid row" data-toggle="buttons">
+            <label class="btn btn-outline-success btn-lg col-sm-3" style="border-radius: 0">
+                <input type="checkbox" autocomplete="off" onchange="toggleState(toggleTv, this)" id="checkTv"> TV
+            </label>
+            <label class="btn btn-outline-warning btn-lg col-sm-3" style="border-radius: 0">
+                <input type="checkbox" autocomplete="off" onchange="toggleState(toggleLights, this)" id="checkLights"> Lights
+            </label>
+            <label class="btn btn-outline-primary btn-lg col-sm-3" style="border-radius: 0">
+                <input type="checkbox" autocomplete="off" onchange="toggleState(toggleHeating, this)" id="checkHeating"> A/C
+            </label>
+            <label class="btn btn-outline-danger btn-lg col-sm-3" style="border-radius: 0">
+                <input type="checkbox" autocomplete="off" onchange="toggleState(toggleAlarm, this)" id="checkSecurity"> Alarm
+            </label>
+        </div>
+    </div>
+
+    <nav class="navbar fixed-bottom navbar-light bg-faded">
+        <p class="lead" id="status"></p>
+    </nav>
+
+    <!-- Modal -->
+    <div class="modal" id="speechModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <h1 class="lead text-center mt-2">Speak now..</h1>
+                    <div class="cssload-container">
+                        <div class="cssload-whirlpool"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.1.1.slim.min.js" integrity="sha384-A7FZj7v+d/sdmMqp/nOQwliLvUsJfDHW+k9Omg/a/EheAdgtzNs3hpfag6Ed950n" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tether/1.4.0/js/tether.min.js" integrity="sha384-DztdAPBWPRXSA/3eYEEUWrWCy7G5KFbe8fFjk5JAIxUYHKkDx6Qin1DkWx51bBrb" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/js/bootstrap.min.js" integrity="sha384-vBWWzlZJ8ea9aCX4pEW3rVHjgjt7zpkNpZk+02D9phzyeVkE+jo0ieGizqPLForn" crossorigin="anonymous"></script>
+
+
+    <script type="text/javascript">
+
+        $('#speechModal').on('hidden.bs.modal', function (e) {
+            console.log('done');
+        });
+
+        var r = document.getElementById('status');
+        var websocket = new WebSocket('wss://smarthouseintern.azurewebsites.net/ws');
+
+        websocket.onclose = function () {
+            console.log("Socket closed..")
+        }
+
+        websocket.onerror = function (err) {
+            alert("Something went wrong with sockets..");
+        }
+
+        websocket.onopen = function () {
+            console.log("Socket opened..")
+        }
+
+        websocket.onmessage = function (event) {
+
+            var msg = JSON.parse(event.data);
+
+            r.innerHTML = '"' + msg.data + '" is sent to the house..';
+
+        }
+
+        var speechRecognizer = new webkitSpeechRecognition();
+        speechRecognizer.continuous = true;
+        speechRecognizer.interimResults = true;
+        speechRecognizer.lang = 'en-EN';
+
+        var finalTranscripts;
+
+        speechRecognizer.onresult = function (event) {
+
+            var interimTranscripts = '';
+            for (var i = event.resultIndex; i < event.results.length; i++) {
+                var transcript = event.results[i][0].transcript;
+
+                if (event.results[i].isFinal) {
+                    finalTranscripts += transcript;
+                }
+            }
+            websocket.send(finalTranscripts);
+
+        };
+        speechRecognizer.onerror = function (event) {
+            alert('Something went wrong with speech api..')
+        };
+
+        function startConverting() {
+            if ('webkitSpeechRecognition' in window) {
+                finalTranscripts = '';
+
+                $('#speechModal').modal('show');
+
+                speechRecognizer.start();
+
+                setTimeout(function () {
+
+                    speechRecognizer.stop();
+                    $('#speechModal').modal('hide');
+
+                }, 3000);
+
+            } else {
+                r.innerHTML = 'Your browser is not supported. If google chrome, please upgrade!';
+            }
+        }
+
+        function toggleState(callback, sender) {
+            callback.apply(this, [sender]);
+        }
+
+        function toggleTv(sender) {
+            if (sender.checked == true) {
+
+                websocket.send('open tv');
+
+            } else {
+
+                websocket.send('close tv');
+
+            }
+
+        }
+
+        function toggleLights(sender) {
+            if (sender.checked == true) {
+
+                websocket.send('open lights');
+
+            } else {
+
+                websocket.send('close lights');
+
+            }
+
+        }
+
+        function toggleHeating(sender) {
+            if (sender.checked == true) {
+
+                websocket.send('open ac');
+
+            } else {
+
+                websocket.send('close ac');
+
+            }
+
+        }
+
+        function toggleAlarm(sender) {
+            if (sender.checked == true) {
+
+                websocket.send('open alarm');
+
+            } else {
+
+                websocket.send('close alarm');
+
+            }
+
+        }
+
+    </script>
+</body>
+</html>
